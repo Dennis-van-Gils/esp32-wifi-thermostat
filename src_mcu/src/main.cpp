@@ -194,39 +194,6 @@ String getInfo() {
     return page;
 }
 
-void handleInfo() {
-    Serial.println(">>> Info request");
-    String tStr = server.arg("value");
-    if (!tStr.isEmpty())
-    {
-        float t = tStr.toFloat();
-        Serial.println(">>> Room Setpoint request: " + String(t));
-        updateRoomSetpointRequest(t);
-    }
-    server.send(200, "text/html", getInfo() + getChart());
-}
-
-void handleRoot() {
-    String page = FPSTR(HTTP_HEAD_BEGIN);
-    page.replace("{v}", "Wi-Fi Thermostat");
-    page += FPSTR(HTTP_STYLE);
-    page += "<script>";
-    page += FPSTR(HTTP_SCRIPT_VARS);
-    page += FPSTR(HTTP_SCRIPT_START_DRAG);
-    page += FPSTR(HTTP_SCRIPT_DO_DRAG);
-    page += FPSTR(HTTP_SCRIPT_STOP_DRAG);
-    page += FPSTR(HTTP_SCRIPT_SEND_STATUS);
-    page += FPSTR(HTTP_SCRIPT_ATTACH_EVENTS);
-    page += FPSTR(HTTP_SCRIPT_UPDATE);
-    page += "</script>";
-    page += FPSTR(HTTP_HEAD_END);
-    page += F("<h1>Wi-Fi Thermostat</h1><div id=\"info\">");
-    page += getInfo() + getChart();
-    page += F("</div>");
-    page += FPSTR(HTTP_END);
-    server.send(200, "text/html", page);
-}
-
 void handleMessage() {
     byte type = server.arg("type").toInt() ? 1 : 0;
     byte id = server.arg("id").toInt();
@@ -436,6 +403,76 @@ void handleChart() {
     server.send(200, "image/svg+xml", getChart());
 }
 
+void handleInfo() {
+    Serial.println(">>> Info request");
+    String tStr = server.arg("value");
+    if (!tStr.isEmpty())
+    {
+        float t = tStr.toFloat();
+        Serial.println(">>> Room Setpoint request: " + String(t));
+        updateRoomSetpointRequest(t);
+    }
+    server.send(200, "text/html", getInfo() + getChart());
+}
+
+void processResponse(unsigned long response, OpenThermResponseStatus status) {
+    if (!ot.isValidResponse(response)) {
+        Serial.println("Invalid response: " + String(response, HEX) + ", status=" + String(ot.getLastResponseStatus()));
+        return;
+    }
+    if (curr_item == NULL) {
+        Serial.println("Failed to process response: " + String(response, HEX));
+        return;
+    }
+    float t;
+    byte id = (response >> 16 & 0xFF);
+    switch (id)
+    {
+    case OpenThermMessageID::Status:
+        boiler_status = response & 0xFF;
+        curr_item->status = boiler_status;
+        Serial.println("Boiler status: " + String(boiler_status, BIN));
+        break;
+    case OpenThermMessageID::TSet:
+        t = (response & 0xFFFF) / 256.0;
+        updateCHTempRequest(t);
+        Serial.println("Set CH temp: " + String(t));
+        break;
+    case OpenThermMessageID::Tboiler:
+        ch_temperature = (response & 0xFFFF) / 256.0;
+        curr_item->ch_temperature = ch_temperature;
+        Serial.println("CH temp: " + String(ch_temperature));
+        break;
+    case OpenThermMessageID::RelModLevel:
+        modulation_level = (response & 0xFFFF) / 256.0;
+        curr_item->modulation = modulation_level;
+        Serial.println("Modulation level: " + String(modulation_level));
+        break;
+    default:
+        Serial.println("Response: " + String(response, HEX) + ", id=" + String(id));
+    }
+}
+
+void handleRoot() {
+    String page = FPSTR(HTTP_HEAD_BEGIN);
+    page.replace("{v}", "Wi-Fi Thermostat");
+    page += FPSTR(HTTP_STYLE);
+    page += "<script>";
+    page += FPSTR(HTTP_SCRIPT_VARS);
+    page += FPSTR(HTTP_SCRIPT_START_DRAG);
+    page += FPSTR(HTTP_SCRIPT_DO_DRAG);
+    page += FPSTR(HTTP_SCRIPT_STOP_DRAG);
+    page += FPSTR(HTTP_SCRIPT_SEND_STATUS);
+    page += FPSTR(HTTP_SCRIPT_ATTACH_EVENTS);
+    page += FPSTR(HTTP_SCRIPT_UPDATE);
+    page += "</script>";
+    page += FPSTR(HTTP_HEAD_END);
+    page += F("<h1>Wi-Fi Thermostat</h1><div id=\"info\">");
+    page += getInfo() + getChart();
+    page += F("</div>");
+    page += FPSTR(HTTP_END);
+    server.send(200, "text/html", page);
+}
 
 void setup(void) {
     pinMode(BUILTIN_LED, OUTPUT);
@@ -485,45 +522,6 @@ void setup(void) {
     sensors.setWaitForConversion(false); //switch to async mode
     room_temperature, room_temperature_last = getTemperature();
     ts = millis();
-}
-
-
-void processResponse(unsigned long response, OpenThermResponseStatus status) {
-    if (!ot.isValidResponse(response)) {
-        Serial.println("Invalid response: " + String(response, HEX) + ", status=" + String(ot.getLastResponseStatus()));
-        return;
-    }
-    if (curr_item == NULL) {
-        Serial.println("Failed to process response: " + String(response, HEX));
-        return;
-    }
-    float t;
-    byte id = (response >> 16 & 0xFF);
-    switch (id)
-    {
-    case OpenThermMessageID::Status:
-        boiler_status = response & 0xFF;
-        curr_item->status = boiler_status;
-        Serial.println("Boiler status: " + String(boiler_status, BIN));
-        break;
-    case OpenThermMessageID::TSet:
-        t = (response & 0xFFFF) / 256.0;
-        updateCHTempRequest(t);
-        Serial.println("Set CH temp: " + String(t));
-        break;
-    case OpenThermMessageID::Tboiler:
-        ch_temperature = (response & 0xFFFF) / 256.0;
-        curr_item->ch_temperature = ch_temperature;
-        Serial.println("CH temp: " + String(ch_temperature));
-        break;
-    case OpenThermMessageID::RelModLevel:
-        modulation_level = (response & 0xFFFF) / 256.0;
-        curr_item->modulation = modulation_level;
-        Serial.println("Modulation level: " + String(modulation_level));
-        break;
-    default:
-        Serial.println("Response: " + String(response, HEX) + ", id=" + String(id));
-    }
 }
 
 void clearItem(ChartItem* item)
