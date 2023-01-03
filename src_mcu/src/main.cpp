@@ -19,8 +19,11 @@
 #include <OpenTherm.h>
 #include "RingBuffer.h"
 
-const char* ssid = "WIFI-SSID";
-const char* password = "WIFI-PASSWORD";
+#if __has_include("wifi_settings.h")
+#  include <wifi_settings.h>
+#else
+#  include <wifi_settings_template.h>
+#endif
 
 //Master OpenTherm Shield pins configuration
 const int OT_IN_PIN = 21;  //4 for ESP8266 (D2), 21 for ESP32
