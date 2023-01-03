@@ -1,4 +1,4 @@
-# ESP32 Wi-Fi OpenTherm Thermostat
+# ESP32 Wi-Fi OpenTherm Thermostat - Forked to conform to VSCode
 
 ESP32 Wi-Fi OpenTherm Thermostat sketch allows you to build simple OpenTherm Wi-Fi thermostat using ESP32 module and [ESP32/ESP8266 Thermostat Shield](https://diyless.com/product/esp8266-thermostat-shield).
 
